@@ -14,18 +14,22 @@ from selenium.webdriver.support import expected_conditions as EC
 options = uc.ChromeOptions()
 options.add_argument('--disable-gpu')
 options.add_argument('--headless=new')
+options.add_argument('--window-size=1920,1080')
 driver = uc.Chrome(options=options)
 
 # --- Scroll to load all job cards ---
-def scroll_to_load_all_jobs(driver, pause_time=2, max_attempts=20):
+def scroll_to_load_all_jobs(driver, pause_time=2, max_attempts=40):
 	last_height = driver.execute_script("return document.body.scrollHeight")
 	attempts = 0
 	while attempts < max_attempts:
+		# Lazy scroll: scroll in increments to trigger loading
+		for frac in [0.25, 0.5, 0.75, 1.0]:
+			driver.execute_script(f"window.scrollTo(0, document.body.scrollHeight*{frac});")
+			time.sleep(0.5)
 		driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 		time.sleep(pause_time)
 		new_height = driver.execute_script("return document.body.scrollHeight")
 		if new_height == last_height:
-
 			time.sleep(3)
 			new_height = driver.execute_script("return document.body.scrollHeight")
 			if new_height == last_height:
@@ -51,6 +55,9 @@ try:
 	if job_cards:
 		for idx, card in enumerate(job_cards):
 			try:
+				# Scroll the card into view before interacting
+				driver.execute_script("arguments[0].scrollIntoView({behavior: 'smooth', block: 'center'});", card)
+				time.sleep(0.5)
 				actions = ActionChains(driver)
 				actions.move_to_element(card).pause(0.5).click(card).perform()
 				print(f"Clicked job card {idx+1}, waiting for dialog...")
@@ -142,7 +149,7 @@ try:
 							header = WebDriverWait(driver, 5).until(
 								EC.visibility_of_element_located((By.CSS_SELECTOR, 'header.chakra-modal__header'))
 							)
-							close_btns = header.find_elements(By.CSS_SELECTOR, 'button.rounded-lg.p-2.text-black.hover\:bg-gray-200.flex-none.outline-none')
+							close_btns = header.find_elements(By.CSS_SELECTOR, r'button.rounded-lg.p-2.text-black.hover\:bg-gray-200.flex-none.outline-none')
 							if close_btns:
 								close_btns[-1].click()
 								print('Closed dialog box using last "X" button.')
