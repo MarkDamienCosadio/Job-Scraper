@@ -3,7 +3,6 @@
 import pandas as pd
 import time
 from selenium.webdriver.common.by import By
-# Use undetected-chromedriver for stealth
 import undetected_chromedriver as uc
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -13,12 +12,12 @@ from selenium.webdriver.support import expected_conditions as EC
 
 options = uc.ChromeOptions()
 options.add_argument('--disable-gpu')
-options.add_argument('--headless=new')
 options.add_argument('--window-size=1920,1080')
+options.add_argument('--disable-blink-features=AutomationControlled')
 driver = uc.Chrome(options=options)
 
 # --- Scroll to load all job cards ---
-def scroll_to_load_all_jobs(driver, pause_time=2, max_attempts=40):
+def scroll_to_load_all_jobs(driver, pause_time=5, max_attempts=40):
 	last_height = driver.execute_script("return document.body.scrollHeight")
 	attempts = 0
 	while attempts < max_attempts:
@@ -132,15 +131,18 @@ try:
 						except Exception:
 							tools = ''
 						job_data['Technical Tools Mentioned'] = tools
-						# Save to CSV (append mode)
+						# Save only job data to CSV (no log/debug messages)
 						job_data_upper = {k.upper(): v for k, v in job_data.items()}
-						try:
-							existing = pd.read_csv('jobs.csv')
-							df = pd.concat([existing, pd.DataFrame([job_data_upper])], ignore_index=True)
-						except Exception:
-							df = pd.DataFrame([job_data_upper])
-						df.to_csv('jobs.csv', index=False, na_rep='N/A')
-						print('Job data extracted and saved to jobs.csv')
+						if 'APPLY LAZY SCROLLING...' in job_data_upper.values():
+							pass  # Do not save log/debug messages
+						else:
+							try:
+								existing = pd.read_csv('jobs.csv')
+								df = pd.concat([existing, pd.DataFrame([job_data_upper])], ignore_index=True)
+							except Exception:
+								df = pd.DataFrame([job_data_upper])
+							df.to_csv('jobs.csv', index=False, na_rep='N/A')
+							print('Job data extracted and saved to jobs.csv')
 						# Close the job tab and switch back to main tab
 						driver.close()
 						driver.switch_to.window(driver.window_handles[0])
