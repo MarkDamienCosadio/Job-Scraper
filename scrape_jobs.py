@@ -13,12 +13,35 @@ from selenium.webdriver.support import expected_conditions as EC
 
 options = uc.ChromeOptions()
 options.add_argument('--disable-gpu')
-
+options.add_argument('--headless=new')
 driver = uc.Chrome(options=options)
+
+# --- Scroll to load all job cards ---
+def scroll_to_load_all_jobs(driver, pause_time=2, max_attempts=20):
+	last_height = driver.execute_script("return document.body.scrollHeight")
+	attempts = 0
+	while attempts < max_attempts:
+		driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+		time.sleep(pause_time)
+		new_height = driver.execute_script("return document.body.scrollHeight")
+		if new_height == last_height:
+
+			time.sleep(3)
+			new_height = driver.execute_script("return document.body.scrollHeight")
+			if new_height == last_height:
+				break
+			last_height = new_height
+		else:
+			last_height = new_height
+		attempts += 1
+	print(f"Scrolled {attempts} times to load all job cards.")
 try:
 	url = "https://hiring.cafe/?searchState=%7B%22searchQuery%22%3A%22marketing+director%22%2C%22dateFetchedPastNDays%22%3A14%2C%22locations%22%3A%5B%7B%22id%22%3A%22ZhY1yZQBoEtHp_8UErzY%22%2C%22types%22%3A%5B%22administrative_area_level_1%22%5D%2C%22address_components%22%3A%5B%7B%22long_name%22%3A%22New+York%22%2C%22short_name%22%3A%22NY%22%2C%22types%22%3A%5B%22administrative_area_level_1%22%5D%7D%2C%7B%22long_name%22%3A%22United+States%22%2C%22short_name%22%3A%22US%22%2C%22types%22%3A%5B%22country%22%5D%7D%5D%2C%22formatted_address%22%3A%22New+York%2C+United+States%22%2C%22population%22%3A19274244%2C%22workplace_types%22%3A%5B%5D%2C%22options%22%3A%7B%22flexible_regions%22%3A%5B%22anywhere_in_country%22%2C%22anywhere_in_continent%22%2C%22anywhere_in_world%22%5D%7D%7D%5D%7D"
 	driver.get(url)
 	time.sleep(5)
+
+	# Scroll to load all job cards before scraping
+	scroll_to_load_all_jobs(driver)
 
 	# Click the first job card, wait for dialog/modal, then click 'Full View' link with correct URL
 	from selenium.webdriver.common.action_chains import ActionChains
@@ -73,8 +96,10 @@ try:
 						try:
 							salary = driver.find_element(By.XPATH, "//span[contains(@class, 'rounded') and contains(@class, 'font-bold') and contains(text(), '/yr')]").text
 						except Exception:
+							salary = ''
+						if not salary or salary.strip() == '':
 							salary = 'N/A'
-						job_data['salary'] = salary		
+						job_data['salary'] = salary						
 						try:
 							job_position = driver.find_element(By.XPATH, "//span[contains(@class, 'rounded') and contains(@class, 'font-bold') and text()='Full Time']").text
 						except Exception:
@@ -107,7 +132,7 @@ try:
 							df = pd.concat([existing, pd.DataFrame([job_data_upper])], ignore_index=True)
 						except Exception:
 							df = pd.DataFrame([job_data_upper])
-						df.to_csv('jobs.csv', index=False)
+						df.to_csv('jobs.csv', index=False, na_rep='N/A')
 						print('Job data extracted and saved to jobs.csv')
 						# Close the job tab and switch back to main tab
 						driver.close()
@@ -137,37 +162,5 @@ try:
 				print(f"Found job card but could not click: {e}")
 	else:
 		print("No job cards found.")
-	input("Press Enter to quit browser...")
 finally:
 	driver.quit()
-
-jobs = []
-
-# Find job cards
-
-job_cards = driver.find_elements(By.CSS_SELECTOR, 'div.JobCard')
-for card in job_cards:
-	try:
-		job_url = card.find_element(By.CSS_SELECTOR, 'a').get_attribute('href')
-		job_title = card.find_element(By.CSS_SELECTOR, 'h2').text
-		company = card.find_element(By.CSS_SELECTOR, '.JobCard-company').text
-		salary = card.find_element(By.CSS_SELECTOR, '.JobCard-salary').text if card.find_elements(By.CSS_SELECTOR, '.JobCard-salary') else ''
-		workplace_type = card.find_element(By.CSS_SELECTOR, '.JobCard-workplaceType').text if card.find_elements(By.CSS_SELECTOR, '.JobCard-workplaceType') else ''
-		remote = 'yes' if 'remote' in workplace_type.lower() else 'no'
-		location = card.find_element(By.CSS_SELECTOR, '.JobCard-location').text if card.find_elements(By.CSS_SELECTOR, '.JobCard-location') else ''
-		posted = card.find_element(By.CSS_SELECTOR, '.JobCard-posted').text if card.find_elements(By.CSS_SELECTOR, '.JobCard-posted') else ''
-
-		import undetected_chromedriver as uc
-
-		# Step 1: Open the URL with undetected Chrome
-		options = uc.ChromeOptions()
-		options.add_argument('--disable-gpu')
-		driver = uc.Chrome(options=options)
-
-		url = "https://hiring.cafe/?searchState=%7B%22searchQuery%22%3A%22marketing+director%22%2C%22dateFetchedPastNDays%22%3A14%2C%22locations%22%3A%5B%7B%22id%22%3A%22ZhY1yZQBoEtHp_8UErzY%22%2C%22types%22%3A%5B%22administrative_area_level_1%22%5D%2C%22address_components%22%3A%5B%7B%22long_name%22%3A%22New+York%22%2C%22short_name%22%3A%22NY%22%2C%22types%22%3A%5B%22administrative_area_level_1%22%5D%7D%2C%7B%22long_name%22%3A%22United+States%22%2C%22short_name%22%3A%22US%22%2C%22types%22%3A%5B%22country%22%5D%7D%5D%2C%22formatted_address%22%3A%22New+York%2C+United+States%22%2C%22population%22%3A19274244%2C%22workplace_types%22%3A%5B%5D%2C%22options%22%3A%7B%22flexible_regions%22%3A%5B%22anywhere_in_country%22%2C%22anywhere_in_continent%22%2C%22anywhere_in_world%22%5D%7D%7D%5D%7D"
-		driver.get(url)
-		input("Press Enter to quit browser...")
-		driver.quit()
-	except Exception as e:
-		print(f"Error processing job card: {e}")
-driver.quit()
